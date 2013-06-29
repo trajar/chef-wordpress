@@ -1,0 +1,10 @@
+
+server {
+  listen       80;
+  server_name  <% @server_aliases.each do |a| %><%= "#{a}" %> <% end %>;
+  root         <%= @docroot %>;
+  access_log   <%= @log_dir %>/<%= @log_name %>.access.log;
+  error_log    <%= @log_dir %>/<%= @log_name %>.error.log;
+  include      /etc/nginx/wordpress.conf;
+  index        index.php;
+}
