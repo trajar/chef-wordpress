@@ -14,6 +14,7 @@ action :create do
   end
   if site_name.nil? && dir
     site_name = File.basename(dir)
+  end
   if dir.nil? && site_name
     dir = "/var/www/#{site_name}"
   end
@@ -96,10 +97,10 @@ action :create do
   end
 
   template "#{dir}/wp-config.php" do
-    source "wp-config.php.erb"
-    owner "root"
-    group "root"
-    mode "0644"
+    source 'wp-config.php.erb'
+    owner 'root'
+    group 'root'
+    mode '0644'
     variables(
         :database        => db_name,
         :user            => db_user,
