@@ -1,29 +1,25 @@
 
+include Opscode::OpenSSL::Password
+
 action :create do
 
-  dir = nil
-  site_name = nil
-  if @new_resource.dir
-    dir = @new_resource.dir
-  end
-  if @new_resource.site_name
-    site_name = @new_resource.site_name
-  end
-  if site_name.nil? && dir.nil?
+  site_dir = @new_resource.site_dir
+  site_name = @new_resource.site_name
+  if site_name.nil? && site_dir.nil?
     raise 'Must specify either wordpress installation directory or site name.'
   end
-  if site_name.nil? && dir
-    site_name = File.basename(dir)
+  if site_name.nil? && site_dir
+    site_name = ::File.basename(site_dir)
   end
-  if dir.nil? && site_name
-    dir = "/var/www/#{site_name}"
+  if site_dir.nil? && site_name
+    site_dir = "/var/www/#{site_name}"
   end
 
-  server_aliases = @new_resource.server_aliases || ['wordpress']['server_aliases']
-  db_name = @new_resource.db_name || site_name
-  db_user = @new_resource.db_user || ['wordpress']['db']['user']
-  db_password = @new_resource.db_password || ['wordpress']['db']['password']
-  db_character_set = @new_resource.db_character_set || ['wordpress']['db']['character_set']
+  server_aliases = @new_resource.server_aliases || node['wordpress']['server_aliases']
+  database = @new_resource.database || site_name
+  db_user = @new_resource.db_user || node['wordpress']['db']['user'] || database
+  db_password = @new_resource.db_password || node['wordpress']['db']['password'] || secure_password
+  db_character_set = @new_resource.db_character_set || node['wordpress']['db']['character_set']
 
   if node.has_key?('ec2')
     server_fqdn = node['ec2']['public_hostname']
@@ -31,21 +27,15 @@ action :create do
     server_fqdn = node['fqdn']
   end
 
-  db_password = secure_password if db_password.nil?
   keys_auth = secure_password
   keys_secure_auth = secure_password
   keys_logged_in = secure_password
   keys_nonce = secure_password
 
-  tarball = "#{Chef::Config[:file_cache_path]}/wordpress-download.tar.gz"
+  tarball = "#{Chef::Config[:file_cache_path]}/wordpress-#{site_name}.tar.gz"
+  grants = "#{node['mysql']['conf_dir']}/#{database}-grants.sql"
 
-  remote_file tarball do
-    checksum node['wordpress']['checksum']
-    source node['wordpress']['url']
-    mode '0644'
-  end
-
-  directory dir do
+  directory "#{site_dir}" do
     owner 'root'
     group 'root'
     mode '0755'
@@ -53,36 +43,43 @@ action :create do
     recursive true
   end
 
-  execute "#{dir}-untar" do
-    cwd dir
-    command "tar --strip-components 1 -xzf #{tarball}"
-    creates "#{dir}/wp-settings.php"
+  remote_file "#{tarball}" do
+    checksum node['wordpress']['checksum']
+    source node['wordpress']['url']
+    mode '0644'
   end
 
-  execute "#{db_name}-privileges" do
-    command "/usr/bin/mysql -u root -p\"#{node['mysql']['server_root_password']}\" < #{node['mysql']['conf_dir']}/wp-grants.sql"
+  execute "#{site_dir}-untar" do
+    cwd site_dir
+    command "tar --strip-components 1 -xzf #{tarball}"
+    creates "#{site_dir}/wp-settings.php"
+  end
+
+  execute "#{database}-privileges" do
+    command "/usr/bin/mysql -u root -p\"#{node['mysql']['server_root_password']}\" < #{grants}"
     action :nothing
   end
 
-  template "#{node['mysql']['conf_dir']}/#{db_name}-wp-grants.sql" do
+  template "#{grants}" do
     source 'grants.sql.erb'
+    cookbook 'wordpress'
     owner 'root'
     group 'root'
     mode '0600'
     variables(
-        :user     => db_user,
-        :password => db_password,
-        :database => db_name
+      :user     => db_user,
+      :password => db_password,
+      :database => database
     )
-    notifies :run, "#{db_name}-privileges", :immediately
+    notifies :run, "execute[#{database}-privileges]", :immediately
   end
 
-  execute "#{db_name}-create" do
-    command "/usr/bin/mysqladmin -u root -p\"#{node['mysql']['server_root_password']}\" create #{db_name} --default-character-set=#{db_character_set}"
+  execute "#{database}-create" do
+    command "/usr/bin/mysqladmin -u root -p\"#{node['mysql']['server_root_password']}\" create #{database} --default-character-set=#{db_character_set}"
     not_if do
       require 'mysql'
       m = Mysql.new('localhost', 'root', node['mysql']['server_root_password'])
-      m.list_dbs.include?(db_name)
+      m.list_dbs.include?(database)
     end
     notifies :create, 'ruby_block[save node data]', :immediately unless Chef::Config[:solo]
   end
@@ -96,32 +93,35 @@ action :create do
     end
   end
 
-  template "#{dir}/wp-config.php" do
+  template "#{site_dir}/wp-config.php" do
     source 'wp-config.php.erb'
+    cookbook 'wordpress'
     owner 'root'
     group 'root'
     mode '0644'
     variables(
-        :database        => db_name,
-        :user            => db_user,
-        :password        => db_password,
-        :character_set   => db_character_set,
-        :auth_key        => keys_auth,
-        :secure_auth_key => keys_secure_auth,
-        :logged_in_key   => keys_logged_in,
-        :nonce_key       => keys_nonce
+      :database        => database,
+      :user            => db_user,
+      :password        => db_password,
+      :character_set   => db_character_set,
+      :auth_key        => keys_auth,
+      :secure_auth_key => keys_secure_auth,
+      :logged_in_key   => keys_logged_in,
+      :nonce_key       => keys_nonce
     )
   end
 
   if 'apache2'.eql?(node['wordpress']['webserver']) || :apache2.eql?(node['wordpress']['webserver'])
 
-    apache_site '000-default' do
+    apache_site 'default' do
       enable false
     end
 
-    web_app site_name do
+    web_app "#{site_name}" do
       template 'wordpress-apache2.conf.erb'
-      docroot dir
+      cookbook 'wordpress'
+      docroot site_dir
+      site_name site_name
       server_name server_fqdn
       server_aliases server_aliases
     end
@@ -130,9 +130,10 @@ action :create do
 
     template "#{node['nginx']['dir']}/wordpress.conf" do
       source 'wordpress-nginx-common.conf.erb'
+      cookbook 'wordpress'
       owner 'root'
       group 'root'
-      mode 00644
+      mode '0644'
       notifies :reload, 'service[nginx]'
       variables({
         :php_fpm_socket => node['php-fpm']['pool']['www']['listen']
@@ -141,15 +142,16 @@ action :create do
 
     template "#{node['nginx']['dir']}/sites-available/#{site_name}" do
       source 'wordpress-nginx.conf.erb'
+      cookbook 'wordpress'
       owner 'root'
       group 'root'
-      mode 00644
+      mode '0644'
       notifies :reload, 'service[nginx]'
       variables({
-        :docroot => db_name,
+        :docroot => site_dir,
         :server_aliases => server_aliases,
         :log_dir => node['nginx']['log_dir'],
-        :log_name => "wordpress-#{site_name}"
+        :log_name => site_name
       })
     end
 
@@ -157,7 +159,7 @@ action :create do
       enable false
     end
 
-    nginx_site 'wordpress' do
+    nginx_site "#{site_name}" do
       enable true
     end
 

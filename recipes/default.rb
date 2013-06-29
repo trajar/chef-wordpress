@@ -19,8 +19,9 @@
 
 include_recipe 'mysql::server'
 include_recipe 'mysql::ruby'
-include_recipe 'php'
+include_recipe 'openssl'
 include_recipe 'php::module_mysql'
+include_recipe 'php'
 
 if 'apache2'.eql?(node['wordpress']['webserver']) || :apache2.eql?(node['wordpress']['webserver'])
   include_recipe 'apache2'
