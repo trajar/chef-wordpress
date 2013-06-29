@@ -1,15 +1,23 @@
 
 action :create do
 
+  dir = nil
+  site_name = nil
   if @new_resource.dir
     dir = @new_resource.dir
-    site_name = File.basename(dir)
-  elsif @new_resource.site_name
+  end
+  if @new_resource.site_name
     site_name = @new_resource.site_name
-    dir = "/var/www/#{site_name}"
-  else
+  end
+  if site_name.nil? && dir.nil?
     raise 'Must specify either wordpress installation directory or site name.'
   end
+  if site_name.nil? && dir
+    site_name = File.basename(dir)
+  if dir.nil? && site_name
+    dir = "/var/www/#{site_name}"
+  end
+
   server_aliases = @new_resource.server_aliases || ['wordpress']['server_aliases']
   db_name = @new_resource.db_name || site_name
   db_user = @new_resource.db_user || ['wordpress']['db']['user']
