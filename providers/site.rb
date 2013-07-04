@@ -17,7 +17,7 @@ action :create do
 
   server_aliases = @new_resource.server_aliases || node['wordpress']['server_aliases']
   database = @new_resource.database || site_name
-  db_user = @new_resource.db_user || node['wordpress']['db']['user'] || database
+  db_user = @new_resource.db_user || node['wordpress']['db']['user']
   db_password = @new_resource.db_password || node['wordpress']['db']['password'] || secure_password
   db_character_set = @new_resource.db_character_set || node['wordpress']['db']['character_set']
 
@@ -35,18 +35,15 @@ action :create do
   tarball = "#{Chef::Config[:file_cache_path]}/wordpress-#{site_name}.tar.gz"
   grants = "#{node['mysql']['conf_dir']}/#{database}-grants.sql"
 
-  directory "#{site_dir}" do
-    owner 'root'
-    group 'root'
-    mode '0755'
-    action :create
-    recursive true
-  end
-
   remote_file "#{tarball}" do
     checksum node['wordpress']['checksum']
     source node['wordpress']['url']
     mode '0644'
+  end
+
+  execute "#{site_dir}-mkdir" do
+    command "mkdir -p #{site_dir}"
+    creates "#{site_dir}"
   end
 
   execute "#{site_dir}-untar" do
