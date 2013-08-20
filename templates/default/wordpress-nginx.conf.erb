@@ -7,4 +7,6 @@ server {
   error_log    <%= @log_dir %>/<%= @log_name %>.error.log;
   include      /etc/nginx/wordpress.conf;
   index        index.php;
+
+  client_max_body_size 2M;
 }
