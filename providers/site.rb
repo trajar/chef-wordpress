@@ -131,9 +131,8 @@ action :create do
       owner 'root'
       group 'root'
       mode '0644'
-      notifies :reload, 'service[nginx]'
       variables({
-        :php_fpm_socket => node['php-fpm']['pool']['www']['listen']
+        :php_fpm_socket => node['wordpress']['php_fpm']['listen']
       })
     end
 
@@ -143,7 +142,6 @@ action :create do
       owner 'root'
       group 'root'
       mode '0644'
-      notifies :reload, 'service[nginx]'
       variables({
         :docroot => site_dir,
         :server_aliases => server_aliases,
@@ -152,12 +150,8 @@ action :create do
       })
     end
 
-    nginx_site 'default' do
-      enable false
-    end
-
     nginx_site "#{site_name}" do
-      enable true
+      action :enable
     end
 
   end

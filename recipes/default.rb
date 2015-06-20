@@ -17,4 +17,7 @@
 # limitations under the License.
 #
 
-# by default, just provide lwrp
+include_recipe 'openssl'
+
+chef_gem 'mysql'
+gem_package 'mysql'

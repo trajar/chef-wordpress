@@ -18,8 +18,6 @@
 #
 
 include_recipe 'mysql::server'
-include_recipe 'mysql::ruby'
-include_recipe 'openssl'
 include_recipe 'php::module_mysql'
 include_recipe 'php'
 
