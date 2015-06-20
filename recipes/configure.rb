@@ -17,4 +17,18 @@
 # limitations under the License.
 #
 
-# by default, just provide lwrp
+include_recipe 'mysql::server'
+include_recipe 'mysql::ruby'
+include_recipe 'openssl'
+include_recipe 'php::module_mysql'
+include_recipe 'php'
+
+if 'apache2'.eql?(node['wordpress']['webserver']) || :apache2.eql?(node['wordpress']['webserver'])
+  include_recipe 'apache2'
+  include_recipe 'apache2::mod_php5'
+elsif 'nginx'.eql?(node['wordpress']['webserver']) || :nginx.eql?(node['wordpress']['webserver'])
+  include_recipe 'nginx'
+  include_recipe 'php-fpm'
+else
+  raise "Unknown wordpress webserver #{node['wordpress']['webserver']}."
+end

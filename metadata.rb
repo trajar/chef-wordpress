@@ -7,11 +7,11 @@ version          '0.1.0'
 
 recipe 'wordpress', 'Installs and configures wordpress site(s) on a single system.'
 
-%w{ php php-fpm openssl }.each do |cb|
-  depends cb
-end
-
+depends 'openssl'
 depends 'mysql', '>= 1.0.5'
 
-recommends 'apache2', '>= 0.99.4'
-recommends 'nginx', '>= 1.7.0'
+recomments 'php'
+recomments 'php-fpm'
+
+recommends 'apache2'
+recommends 'nginx'
