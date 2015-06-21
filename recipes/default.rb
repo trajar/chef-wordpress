@@ -19,5 +19,13 @@
 
 include_recipe 'openssl'
 
+package ['ruby', 'ruby-dev'] do
+  action :install
+end
+
+package ['mysql-client', 'libmysqlclient-dev'] do
+  action :install
+end
+
 chef_gem 'mysql'
 gem_package 'mysql'
